@@ -1,0 +1,102 @@
+[package]
+name = "reala"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.91"
+# === Publication info ===
+authors = ["Hantong Chen <>"]
+categories = ["network-programming"]
+description = "Simple but powerful Layer 4 proxy server."
+keywords = ["l4", "proxy"]
+license = "AGPL-3.0-only"
+readme = "README.md"
+repository = "https://github.com/hanyu-dev/reala"
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.22.1"
+humat = "0.3.0"
+mimalloc = { version = "0.1.48", optional = true }
+proxy-protocol-codec = "0.3.0"
+serde = { version = "1.0", default-features = false, features = ["derive", "rc"] }
+serde-saphyr = "0.0.7"
+socket2 = "0.6.1"
+tokio = { version = "1.48", features = [
+    "fs",
+    "io-util",
+    "macros",
+    "net",
+    "parking_lot",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+] }
+tokio-uni-stream = "0.0.5"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["chrono", "env-filter", "parking_lot"] }
+uni-addr = { version = "0.3.2", default-features = false, features = ["feat-serde"] }
+wrapper-lite = "0.3.2"
+
+[target.'cfg(unix)'.dependencies]
+tokio-splice2 = "0.3.2"
+tokio-uni-stream = { version = "0.0.5", features = ["splice"] }
+
+[build-dependencies]
+chrono = "0.4.42"
+
+[patch.crates-io]
+# tokio-uni-stream = { path = "../tokio-uni-stream" }
+
+[lints]
+clippy.allow_attributes_without_reason = "warn"
+clippy.assertions_on_result_states = "warn"
+clippy.assigning_clones = "warn"
+clippy.bool_to_int_with_if = "warn"
+clippy.cognitive_complexity = "warn"
+clippy.create_dir = "warn"
+clippy.dbg_macro = "warn"
+clippy.debug_assert_with_mut_call = "warn"
+clippy.default_trait_access = "warn"
+clippy.disallowed_script_idents = "deny"
+clippy.doc_link_with_quotes = "warn"
+clippy.doc_markdown = "warn"
+clippy.else_if_without_else = "deny"
+clippy.enum_glob_use = "warn"
+clippy.filetype_is_file = "warn"
+clippy.inefficient_to_string = "warn"
+clippy.mem_forget = "warn"
+clippy.missing_panics_doc = "warn"
+clippy.mod_module_files = "deny"
+clippy.multiple_inherent_impl = "warn"
+clippy.mutex_atomic = "warn"
+clippy.mutex_integer = "warn"
+clippy.needless_continue = "warn"
+clippy.panic = "warn"
+clippy.significant_drop_in_scrutinee = "warn"
+clippy.todo = "warn"
+clippy.unimplemented = "warn"
+clippy.unreachable = "warn"
+clippy.wildcard_dependencies = "deny"
+clippy.wildcard_imports = "warn"
+rust.unsafe_code = "warn"
+rust.missing_docs = "warn"
+rust.missing_debug_implementations = "warn"
+rust.unreachable_pub = "warn"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+incremental = false
+panic = "abort"
+strip = true
+
+[features]
+# Default features
+default = ["mimalloc"]
+
+# Enable `mimalloc` as the global allocator
+mimalloc = ["dep:mimalloc"]

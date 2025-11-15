@@ -1,0 +1,17 @@
+[Unit]
+Description = "REALA (legacy) Service"
+Documentation=https://github.com/hanyu-dev/reala-legacy
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/reala
+ExecStart=/opt/reala/reala
+ExecReload=kill -HUP $MAINPID
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
