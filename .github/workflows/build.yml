@@ -126,9 +126,9 @@ jobs:
           RUSTFLAGS: ${{ env.RUSTFLAGS }} ${{ matrix.rustflags }}
         run: |
           if [ "${{ matrix.cross }}" = "true" ]; then
-            cross build --profile=${{ matrix.profile || 'release' }} ${{ matrix.features }} --target=${{ matrix.target }}
+            cross build --package reala --profile=${{ matrix.profile || 'release' }} ${{ matrix.features }} --target=${{ matrix.target }}
           else
-            cargo build --profile=${{ matrix.profile || 'release' }} ${{ matrix.features }} --target=${{ matrix.target }}
+            cargo build --package reala --profile=${{ matrix.profile || 'release' }} ${{ matrix.features }} --target=${{ matrix.target }}
           fi
         shell: bash
 
