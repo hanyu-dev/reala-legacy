@@ -1,12 +1,20 @@
 #![doc = include_str!("../README.md")]
+#![cfg_attr(not(debug_assertions), allow(unused))]
+#![cfg_attr(not(debug_assertions), allow(dead_code))]
 
+#[cfg(feature = "cli")]
+mod cli;
 mod config;
 mod relay;
 mod util;
 
 use anyhow::Result;
+#[cfg(feature = "cli")]
+use clap::Parser;
 
-use crate::config::Config;
+#[cfg(feature = "cli")]
+use crate::cli::{Cli, CommandHandled};
+use crate::config::{CONFIG_FILE_PATH, CONFIG_GLOBAL, Config};
 use crate::relay::Server;
 
 // Use mimalloc.
@@ -16,6 +24,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    #[cfg(feature = "cli")]
+    let Cli { config, command } = Cli::parse();
+
     // The tracing-subscriber initialization.
     {
         use tracing_subscriber::filter::LevelFilter;
@@ -36,56 +47,60 @@ async fn main() -> Result<()> {
         tracing_subscriber::registry().with(fmt_layer).init();
     }
 
-    tracing::info!("{} built at {}", util::VERSION, util::BUILD_TIME);
+    #[cfg(feature = "cli")]
+    if let Some(command) = command {
+        match command.handle(&config).await? {
+            CommandHandled::Exit => {
+                return Ok(());
+            }
+            CommandHandled::Continue => {
+                // Continue to start the server.
+            }
+        }
+    }
+
+    tracing::info!("Running {} built at {}", util::VERSION, util::BUILD_TIME);
 
     // Loads the initial config.
     {
-        let config = Config::load(None).await?;
+        #[cfg(not(feature = "cli"))]
+        let config = Config::load(None, false).await?;
 
+        #[cfg(feature = "cli")]
+        let config = Config::load(Some(&config), false).await?;
+
+        // Spawns the server.
         Server::spawn(config).await;
     }
 
     tokio::select! {
         biased;
-        _ = signal_handler() => {
+        _ = handle_termination() => {
             Ok(())
         },
+        _ = handle_config_reload() => {
+            Ok(())
+        }
     }
 }
 
-async fn signal_handler() {
+// === Signal Handlers ===
+
+async fn handle_termination() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};
 
         let mut sigterm = signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal");
         let mut sigint = signal(SignalKind::interrupt()).expect("Failed to create SIGINT signal");
-        let mut sighup = signal(SignalKind::hangup()).expect("Failed to create SIGHUP signal");
 
-        loop {
-            tokio::select! {
-                    _ = sigterm.recv() => {
-                        tracing::info!("Received SIGTERM, shutting down...");
-                        break;
-                    }
-                    _ = sigint.recv() => {
-                        tracing::info!("Received SIGINT, shutting down...");
-                        break;
-                    }
-                    _ = sighup.recv() => {
-                        tracing::info!("Received SIGHUP, reloading configuration...");
-
-                        match Config::load(None).await {
-                            Ok(config) => {
-                                Server::spawn(config).await;
-
-                                tracing::info!("Configuration reloaded successfully.");
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to reload configuration: {:?}", e);
-                            }
-                        }
-                    }
+        tokio::select! {
+            biased;
+            _ = sigterm.recv() => {
+                tracing::info!("Received SIGTERM, shutting down...");
+            }
+            _ = sigint.recv() => {
+                tracing::info!("Received SIGINT, shutting down...");
             }
         }
     }
@@ -95,6 +110,74 @@ async fn signal_handler() {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to listen for Ctrl-C");
+
         tracing::info!("Received Ctrl-C, shutting down...");
+    }
+}
+
+async fn handle_config_reload() {
+    use crate::util::file::Changing;
+
+    #[cfg(unix)]
+    let mut sighup = {
+        use tokio::signal::unix::{SignalKind, signal};
+
+        signal(SignalKind::hangup()).expect("Failed to create SIGHUP signal")
+    };
+
+    let mut changing = if CONFIG_GLOBAL
+        .load()
+        .as_ref()
+        .expect("Must have global config initialized")
+        .auto_reload
+    {
+        Changing::new_or_noop(
+            CONFIG_FILE_PATH
+                .get()
+                .expect("Config file path must be set"),
+        )
+    } else {
+        Changing::new_noop()
+    };
+
+    loop {
+        tokio::select! {
+            _ = async {
+                #[cfg(unix)]
+                {
+                    sighup.recv().await
+                }
+
+                #[cfg(not(unix))]
+                {
+                    std::future::pending::<()>().await
+                }
+            } => {
+                tracing::info!("Received SIGHUP, reloading configuration...");
+            },
+            res = &mut changing => {
+                match res {
+                    Ok(_) => {
+                        tracing::info!("Configuration file changed, reloading...");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to watch configuration file changes: {:?}", e);
+                        // Stop auto-reloading on error.
+                        changing = Changing::new_noop();
+                    }
+                }
+            }
+        }
+
+        match Config::load(None, true).await {
+            Ok(config) => {
+                Server::spawn(config).await;
+
+                tracing::info!("Configuration reloaded successfully.");
+            }
+            Err(e) => {
+                tracing::error!("Malformed configuration, ignored: {:?}", e);
+            }
+        }
     }
 }

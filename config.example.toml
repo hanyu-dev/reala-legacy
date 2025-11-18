@@ -1,0 +1,158 @@
+# Example configuration file
+
+# The config version, do not change this manually
+version = 0
+
+[global]
+# Whether to reload the config file automatically when it changes.
+#
+# Defaults to `true`.
+auto_reload = true
+
+[[endpoints]]
+# The address and port to listen on
+listen = "0.0.0.0:8080"
+
+# Whether to enable TCP Fast Open when accepting TCP connections.
+#
+# Defaults to `true`.
+listen_enable_tfo = true
+
+# Whether to enable PROXY protocol (v2) support when accepting
+# connections.
+#
+# When enabled, the actual target address will be extracted from the
+# PROXY protocol header instead of using the one from `target` field.
+#
+# Defaults to `false`.
+listen_proxy_protocol_v2 = false
+
+# Whether we require a PROXY protocol (v2) header when accepting
+# connections.
+#
+# When [`Endpoint::listen_proxy_protocol_v2`] is disabled, this option
+# does nothing; otherwise, we will reject connections without a valid
+# PROXY protocol (v2) header.
+#
+# Defaults to `true`.
+listen_require_proxy_protocol_v2 = true
+
+# Base64 encoded PSK for decrypting the PROXY protocol (v2) header.
+#
+# Since exposing the actual target address to public may lead to security
+# issues, encrypting the header can mitigate this.
+#
+# Should be cryptographically secure random bytes. You may generate it
+# with `openssl rand -base64 32`.
+#
+# Defaults to `None`.
+# listen_proxy_protocol_header_encryption = ""
+
+# IP TOS (Type of Service) value for accepted connections.
+#
+# This only works for IPv4 sockets.
+#
+# - LOWDELAY: 0x10
+# - THROUGHPUT: 0x08
+# - RELIABILITY: 0x04
+# - MINCOST: 0x02
+#
+# Defaults to `None`.
+accepted_conn_ipv4_tos = 8
+
+# The amount of time after which TCP keepalive probes will be sent on idle
+# connections.
+#
+# Set to `0` to disable TCP keep alive.
+#
+# Defaults to 15s.
+accepted_conn_tcp_keep_alive_time = 15
+
+# The time interval between TCP keepalive probes.
+#
+# Set to `0` to disable TCP keep alive.
+#
+# Defaults to 15s.
+accepted_conn_tcp_keep_alive_interval = 15
+
+# The maximum number of TCP keepalive probes that will be sent before
+# dropping a connection, if TCP keepalive is enabled on this socket.
+#
+# Set to `0` to disable TCP keep alive.
+#
+# Defaults to 3.
+accepted_conn_tcp_keep_alive_retries = 3
+
+# Whether to disable TCP_NODELAY (Nagle's algorithm) for accepted TCP
+# connections.
+#
+# This will decrease latency for small packets, but adds more overhead
+# for TCP connections.
+#
+# Defaults to `false`.
+accepted_conn_tcp_no_delay = false
+
+# The remote address to forward traffic to.
+remote = "127.0.0.1:80"
+
+# Whether to enable preconnecting to the [`Endpoint::remote`].
+#
+# Note that the [`Endpoint::remote`] should be able to accept multiple
+# connections simultaneously, and tolerate no application data input for
+# several seconds without interrupting the connection at the application
+# layer.
+#
+# Defaults to `false`.
+connect_enable_preconnect = false
+
+# Whether to enable TCP Fast Open when connecting to the
+# [`Endpoint::remote`].
+#
+# Defaults to `false`.
+#
+# Currently unused.
+connect_enable_tfo = true
+
+# IP TOS (Type of Service) value for connected connections.
+#
+# This only works for IPv4 sockets.
+#
+# - LOWDELAY: 0x10
+# - THROUGHPUT: 0x08
+# - RELIABILITY: 0x04
+# - MINCOST: 0x02
+#
+# Defaults to `None`.
+connected_conn_ipv4_tos = 8
+
+# The amount of time after which TCP keepalive probes will be sent on idle
+# connections.
+#
+# Set to `0` to disable TCP keep alive.
+#
+# Defaults to `15s`.
+connected_conn_tcp_keep_alive_time = 15
+
+# The time interval between TCP keepalive probes.
+#
+# Set to `0` to disable TCP keep alive.
+#
+# Defaults to `15s`.
+connected_conn_tcp_keep_alive_interval = 15
+
+# The maximum number of TCP keepalive probes that will be sent before
+# dropping a connection, if TCP keepalive is enabled on this socket.
+#
+# Set to `0` to disable TCP keep alive.
+#
+# Defaults to `3`.
+connected_conn_tcp_keep_alive_retries = 3
+
+# Whether to disable TCP_NODELAY (Nagle's algorithm) for connected TCP
+# connections.
+#
+# This will decrease latency for small packets, but adds more overhead
+# for TCP connections.
+#
+# Defaults to `false`.
+connected_conn_tcp_no_delay = false

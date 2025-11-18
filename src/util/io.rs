@@ -1,12 +1,12 @@
-//! Copy unidirectionally from a reader to a writer.
+//! IO related utilities.
 
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::task::{Context, Poll, ready};
 
+use portable_atomic::{AtomicU64, Ordering};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 #[derive(Debug)]

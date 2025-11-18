@@ -1,0 +1,162 @@
+name: CI Build
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: full
+
+jobs:
+  build:
+    name: Build (target ${{matrix.target}})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Tier 1
+          # - target: x86_64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          # - target: aarch64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          #   cross: true
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+            features: ""
+          # Tier 2
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+            features: ""
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+            features: ""
+          - target: loongarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+            features: ""
+          - target: arm-unknown-linux-musleabi
+            os: ubuntu-latest
+            cross: true
+            features: ""
+          - target: arm-unknown-linux-musleabihf
+            os: ubuntu-latest
+            cross: true
+            features: ""
+          - target: armv7-unknown-linux-musleabi
+            os: ubuntu-latest
+            cross: true
+            features: ""
+          - target: armv7-unknown-linux-musleabihf
+            os: ubuntu-latest
+            cross: true
+            features: ""
+          # Tier 3
+          - target: mips-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+            profile: release-thin
+            rustflags: '-C target-feature=-crt-static'
+            features: "--no-default-features"
+          - target: mipsel-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+            profile: release-thin
+            rustflags: '-C target-feature=-crt-static'
+            features: "--no-default-features"
+          - target: mips64-unknown-linux-muslabi64
+            os: ubuntu-latest
+            cross: true
+            profile: release-thin
+            rustflags: '-C target-feature=-crt-static'
+            features: "--no-default-features"
+          - target: mips64el-unknown-linux-muslabi64
+            os: ubuntu-latest
+            cross: true
+            profile: release-thin
+            rustflags: '-C target-feature=-crt-static'
+            features: "--no-default-features"
+          - target: riscv64gc-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+            profile: release-thin
+            rustflags: '-C target-feature=-crt-static'
+            features: "--no-default-features"
+    timeout-minutes: 45
+    env:
+      RELEASE_DIR: release-${{ matrix.target }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cross
+        if: matrix.cross
+        id: cache-cross
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cross
+          key: ${{ runner.os }}-cross
+
+      - name: Install cross
+        if: matrix.cross && steps.cache-cross.outputs.cache-hit != 'true'
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        env:
+          RUSTFLAGS: ${{ env.RUSTFLAGS }} ${{ matrix.rustflags }}
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --profile=${{ matrix.profile || 'release' }} ${{ matrix.features }} --target=${{ matrix.target }}
+          else
+            cargo build --profile=${{ matrix.profile || 'release' }} ${{ matrix.features }} --target=${{ matrix.target }}
+          fi
+        shell: bash
+
+      - name: Pack
+        run: |
+          BUILD_PROFILE="${{ matrix.profile || 'release' }}"
+          BINARY_PATH="target/${{ matrix.target }}/$BUILD_PROFILE"
+          ARCHIVE_NAME="reala-${{ matrix.target }}.tar.gz"
+
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            BINARY_NAME="reala.exe"
+          else
+            BINARY_NAME="reala"
+          fi
+
+          mkdir -p ${{ env.RELEASE_DIR }}
+          tar -C $BINARY_PATH -zcf ${{ env.RELEASE_DIR }}/$ARCHIVE_NAME $BINARY_NAME
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: reala-${{ matrix.target }}
+          path: ${{ env.RELEASE_DIR }}/*
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: ${{ env.RELEASE_DIR }}/*

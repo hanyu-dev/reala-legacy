@@ -1,26 +1,32 @@
 [package]
 name = "reala"
-version = "0.0.0"
+version = "0.0.2"
 edition = "2024"
 rust-version = "1.91"
 # === Publication info ===
 authors = ["Hantong Chen <>"]
 categories = ["network-programming"]
 description = "Simple but powerful Layer 4 proxy server."
-keywords = ["l4", "proxy"]
+keywords = ["proxy"]
 license = "AGPL-3.0-only"
 readme = "README.md"
 repository = "https://github.com/hanyu-dev/reala"
 
 [dependencies]
 anyhow = "1.0"
+arc-swap = "1.7"
 base64 = "0.22.1"
+clap = { version = "4.5", optional = true, features = ["derive"] }
+crossfire = { version = "2.1.7", features = ["tokio"] }
 humat = "0.3.0"
 mimalloc = { version = "0.1.48", optional = true }
-proxy-protocol-codec = "0.3.0"
+notify = "8.2"
+num_cpus = "1.17"
+portable-atomic = "1.11"
+proxy-protocol-codec = "0.3.1"
+quanta = "0.12.6"
 serde = { version = "1.0", default-features = false, features = ["derive", "rc"] }
-serde-saphyr = "0.0.7"
-socket2 = "0.6.1"
+thiserror = "2.0"
 tokio = { version = "1.48", features = [
     "fs",
     "io-util",
@@ -31,21 +37,50 @@ tokio = { version = "1.48", features = [
     "signal",
     "sync",
 ] }
-tokio-uni-stream = "0.0.5"
+tokio-uni-stream = "0.0.9"
+toml = { version = "0.9.8", features = ["preserve_order"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["chrono", "env-filter", "parking_lot"] }
-uni-addr = { version = "0.3.2", default-features = false, features = ["feat-serde"] }
+uni-addr = { version = "0.3.4", default-features = false, features = ["feat-serde"] }
 wrapper-lite = "0.3.2"
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 tokio-splice2 = "0.3.2"
-tokio-uni-stream = { version = "0.0.5", features = ["splice"] }
+tokio-uni-stream = { version = "0.0.9", features = ["splice"] }
 
 [build-dependencies]
 chrono = "0.4.42"
 
 [patch.crates-io]
 # tokio-uni-stream = { path = "../tokio-uni-stream" }
+
+[features]
+# Default features
+default = ["mimalloc", "cli"]
+
+# Enable `mimalloc` as the global allocator.
+mimalloc = ["dep:mimalloc"]
+
+# Enable command line interface.
+#
+# This will introduce ~500 KiB binary size overhead.
+cli = ["dep:clap"]
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+incremental = false
+panic = "abort"
+strip = true
+split-debuginfo = "unpacked"
+
+[profile.release-thin]
+inherits = "release"
+opt-level = "s"
 
 [lints]
 clippy.allow_attributes_without_reason = "warn"
@@ -82,21 +117,3 @@ rust.unsafe_code = "warn"
 rust.missing_docs = "warn"
 rust.missing_debug_implementations = "warn"
 rust.unreachable_pub = "warn"
-
-[profile.dev]
-debug = "line-tables-only"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-incremental = false
-panic = "abort"
-strip = true
-
-[features]
-# Default features
-default = ["mimalloc"]
-
-# Enable `mimalloc` as the global allocator
-mimalloc = ["dep:mimalloc"]

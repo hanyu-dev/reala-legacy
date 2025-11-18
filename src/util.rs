@@ -1,8 +1,7 @@
 //! Utils
 
-mod io;
-
-pub(crate) use self::io::copy;
+pub(crate) mod file;
+pub(crate) mod io;
 
 /// The version of the server.
 pub(crate) const VERSION: &str = concat!("v", include_str!(concat!(env!("OUT_DIR"), "/VERSION")));
